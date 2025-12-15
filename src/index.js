@@ -426,13 +426,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'susan_add_knowledge': {
         const project = args?.project || DEFAULT_PROJECT;
-        const data = await susanFetch('/api/knowledge', {
+        const data = await susanFetch('/api/remember', {
           method: 'POST',
           body: JSON.stringify({
-            project,
+            projectPath: project,
             title: args.title,
-            content: args.content,
+            summary: args.content,
             category: args.category,
+            importance: 8,
           }),
         });
 
