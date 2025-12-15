@@ -79,15 +79,32 @@ Tiffany handles testing and documentation:
 - Validates code changes
 - Maintains test coverage reports
 
-### Ryan - The Build Engineer (DevOps)
-**Port: TBD** *(Planned)*
+### Ryan - The Project Orchestrator (Project Management)
+**Port: 5404** *(Planned)*
 
-Ryan manages builds and deployments:
-- Automates build pipelines
-- Manages version releases
-- Handles CI/CD workflows
-- Monitors performance metrics
-- Packages for distribution
+Ryan keeps multi-project development on track:
+- Tracks project stages and completion percentages across all projects
+- Understands project dependencies (e.g., "Portal needs Engine + Sources")
+- Suggests which project needs attention next based on priorities
+- Prevents scope creep by keeping focus on current milestones
+- Rotates work strategically: "Engine is stable at Stage 3, Sources needs attention now"
+- Pulls from Susan's todos to maintain accountability
+- Celebrates milestone completions and guides next steps
+
+**Example Ryan guidance:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PROJECT STATUS                                                  │
+│                                                                  │
+│  NextBid Engine     ████████░░ Stage 3/5  ← "Stable, park it"   │
+│  NextBid Sources    ████░░░░░░ Stage 2/5  ← "Needs attention"   │
+│  Dev Dashboard      ████████░░ Stage 4/5  ← "Almost done"       │
+│  Kodiack Studios    ██░░░░░░░░ Stage 1/5  ← "Just started"      │
+│                                                                  │
+│  RYAN SAYS: "Engine is stable. Sources is the bottleneck now -  │
+│  let's push it to Stage 3, then we can unblock Portal."         │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Claude - The Lead Developer
 **Port: 5400**
@@ -143,11 +160,11 @@ The server-side Claude instance that:
 │                       │ - Decisions     │                           │
 │                       └─────────────────┘                           │
 │                                                                       │
-│  ┌─────────────────┐  ┌─────────────────┐                           │
-│  │ Tiffany :5402   │  │   Ryan :????    │                           │
-│  │   (Planned)     │  │   (Planned)     │                           │
-│  │  QA Engineer    │  │  Build Engineer │                           │
-│  └─────────────────┘  └─────────────────┘                           │
+│  ┌─────────────────┐  ┌───────────────────┐                         │
+│  │ Tiffany :5402   │  │   Ryan :5404      │                         │
+│  │   (Planned)     │  │   (Planned)       │                         │
+│  │  QA Engineer    │  │ Project Orchestr. │                         │
+│  └─────────────────┘  └───────────────────┘                         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -463,7 +480,7 @@ WantedBy=multi-user.target
 | 5401 | Chad | Active | Transcript relay and monitoring |
 | 5402 | Tiffany | Planned | QA testing and documentation |
 | 5403 | Susan | Active | Knowledge base and deep memory |
-| 5404 | Ryan | Planned | Build and deployment automation |
+| 5404 | Ryan | Planned | Project orchestration and milestone tracking |
 | 5405 | Dev Studio Web | Active | Web-based development interface |
 
 ---
@@ -589,12 +606,14 @@ Receive output:
 - [ ] Documentation generation
 - [ ] Test coverage tracking
 
-### Phase 3: Build Automation
-- [ ] Ryan - Build engineer on port TBD
-- [ ] CI/CD pipeline management
-- [ ] Multi-platform builds
-- [ ] Version management
-- [ ] Release automation
+### Phase 3: Project Orchestration
+- [ ] Ryan - Project Orchestrator on port 5404
+- [ ] Multi-project tracking with stages (1-5)
+- [ ] Project dependency mapping
+- [ ] Milestone management and accountability
+- [ ] Strategic work rotation suggestions
+- [ ] Integration with Susan's todos
+- [ ] Scope creep prevention
 
 ### Phase 4: Advanced Features
 - [ ] Voice integration
@@ -602,6 +621,7 @@ Receive output:
 - [ ] Team collaboration (multiple developers)
 - [ ] Analytics dashboard
 - [ ] Plugin system
+- [ ] Cross-project dependency visualization
 
 ---
 
