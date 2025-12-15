@@ -14,10 +14,19 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import WebSocket from 'ws';
 
 // Susan's API on the dev server
 const SUSAN_URL = process.env.SUSAN_URL || 'http://161.35.229.220:5403';
 const DEFAULT_PROJECT = process.env.KODIACK_PROJECT || '/var/www/NextBid_Dev/dev-studio-5000';
+
+// Server Claude terminal WebSocket
+const CLAUDE_SERVER_WS = process.env.CLAUDE_SERVER_WS || 'ws://161.35.229.220:5400';
+
+// WebSocket connection to server Claude
+let serverClaudeWs = null;
+let serverClaudeBuffer = '';
+let serverClaudeConnected = false;
 
 /**
  * Fetch from Susan's API
@@ -42,6 +51,99 @@ async function susanFetch(endpoint, options = {}) {
     console.error(`[Kodiack Studio] Susan API error: ${error.message}`);
     throw error;
   }
+}
+
+/**
+ * Connect to server Claude's terminal
+ */
+function connectToServerClaude(projectPath = DEFAULT_PROJECT) {
+  return new Promise((resolve, reject) => {
+    if (serverClaudeWs && serverClaudeConnected) {
+      resolve(true);
+      return;
+    }
+
+    const wsUrl = `${CLAUDE_SERVER_WS}?path=${encodeURIComponent(projectPath)}&mode=claude`;
+    console.error(`[Kodiack Studio] Connecting to server Claude: ${wsUrl}`);
+
+    serverClaudeWs = new WebSocket(wsUrl);
+    serverClaudeBuffer = '';
+
+    serverClaudeWs.on('open', () => {
+      serverClaudeConnected = true;
+      console.error('[Kodiack Studio] Connected to server Claude terminal');
+      resolve(true);
+    });
+
+    serverClaudeWs.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'output') {
+          // Strip ANSI codes for cleaner output
+          const clean = msg.data
+            .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+            .replace(/\x1b\[\?[0-9;]*[a-zA-Z]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/\x1b/g, '');
+          serverClaudeBuffer += clean;
+          // Keep buffer manageable
+          if (serverClaudeBuffer.length > 50000) {
+            serverClaudeBuffer = serverClaudeBuffer.slice(-30000);
+          }
+        }
+      } catch (e) {
+        // Raw data
+        serverClaudeBuffer += data.toString();
+      }
+    });
+
+    serverClaudeWs.on('error', (err) => {
+      console.error('[Kodiack Studio] Server Claude WebSocket error:', err.message);
+      serverClaudeConnected = false;
+      reject(err);
+    });
+
+    serverClaudeWs.on('close', () => {
+      console.error('[Kodiack Studio] Server Claude disconnected');
+      serverClaudeConnected = false;
+      serverClaudeWs = null;
+    });
+
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      if (!serverClaudeConnected) {
+        reject(new Error('Connection timeout'));
+      }
+    }, 10000);
+  });
+}
+
+/**
+ * Send command to server Claude
+ */
+async function sendToServerClaude(command) {
+  if (!serverClaudeWs || !serverClaudeConnected) {
+    await connectToServerClaude();
+  }
+
+  // Clear buffer before sending so we capture the response
+  serverClaudeBuffer = '';
+
+  // Send the command
+  serverClaudeWs.send(JSON.stringify({ type: 'input', data: command }));
+  serverClaudeWs.send(JSON.stringify({ type: 'input', data: '\r' }));
+
+  // Wait for response to accumulate
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  return serverClaudeBuffer;
+}
+
+/**
+ * Get recent output from server Claude
+ */
+function getServerClaudeOutput() {
+  return serverClaudeBuffer;
 }
 
 /**
@@ -177,6 +279,58 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: 'server_claude_connect',
+        description: 'Connect to the server-side Claude terminal at :5400. Call this before sending commands.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            project: {
+              type: 'string',
+              description: 'Project path on the server (defaults to dev-studio-5000)',
+            },
+          },
+        },
+      },
+      {
+        name: 'server_claude_send',
+        description: 'Send a command/message to server-side Claude and get the response. Server Claude will execute directly on the server codebase.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            command: {
+              type: 'string',
+              description: 'The command or message to send to server Claude',
+            },
+            waitMs: {
+              type: 'number',
+              description: 'How long to wait for response (default 5000ms)',
+            },
+          },
+          required: ['command'],
+        },
+      },
+      {
+        name: 'server_claude_output',
+        description: 'Get the recent output buffer from server Claude terminal',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            lines: {
+              type: 'number',
+              description: 'Number of recent lines to return (default all)',
+            },
+          },
+        },
+      },
+      {
+        name: 'server_claude_status',
+        description: 'Check if connected to server Claude terminal',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -301,6 +455,64 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: 'text', text }],
+        };
+      }
+
+      // Server Claude tools
+      case 'server_claude_connect': {
+        const project = args?.project || DEFAULT_PROJECT;
+        await connectToServerClaude(project);
+        return {
+          content: [{ type: 'text', text: `Connected to server Claude at ${CLAUDE_SERVER_WS} for project ${project}` }],
+        };
+      }
+
+      case 'server_claude_send': {
+        const { command, waitMs } = args;
+        if (!command) {
+          throw new Error('command is required');
+        }
+
+        // Connect if not already connected
+        if (!serverClaudeConnected) {
+          await connectToServerClaude();
+        }
+
+        // Clear buffer and send command
+        serverClaudeBuffer = '';
+        serverClaudeWs.send(JSON.stringify({ type: 'input', data: command }));
+        serverClaudeWs.send(JSON.stringify({ type: 'input', data: '\r' }));
+
+        // Wait for response
+        const wait = waitMs || 5000;
+        await new Promise(resolve => setTimeout(resolve, wait));
+
+        return {
+          content: [{ type: 'text', text: serverClaudeBuffer || '(no output yet - server Claude may still be processing)' }],
+        };
+      }
+
+      case 'server_claude_output': {
+        const lines = args?.lines;
+        let output = serverClaudeBuffer;
+
+        if (lines && lines > 0) {
+          const allLines = output.split('\n');
+          output = allLines.slice(-lines).join('\n');
+        }
+
+        return {
+          content: [{ type: 'text', text: output || '(buffer empty)' }],
+        };
+      }
+
+      case 'server_claude_status': {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            connected: serverClaudeConnected,
+            wsUrl: CLAUDE_SERVER_WS,
+            bufferSize: serverClaudeBuffer.length,
+          }, null, 2) }],
         };
       }
 
