@@ -41,39 +41,63 @@ function log(message, data = {}) {
 }
 
 /**
- * Send transcript to Susan
+ * Send transcript to Susan using /api/message endpoint
  */
 async function sendToSusan(messages, summary = '') {
-  try {
-    const response = await fetch(`${SUSAN_URL}/api/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project: PROJECT_PATH,
-        source: 'chad-local',
-        sessionId,
-        summary: summary || `Local Claude Code session checkpoint at ${new Date().toISOString()}`,
-        messages,
-        metadata: {
-          checkpoint: true,
-          timestamp: Date.now(),
-          messageCount: messages.length
-        }
-      })
-    });
+  let successCount = 0;
 
-    if (response.ok) {
-      const result = await response.json();
-      log('Checkpoint sent to Susan', { messageCount: messages.length, result });
-      return true;
-    } else {
-      log('Susan rejected checkpoint', { status: response.status });
-      return false;
+  // Send each message individually to Susan's /api/message endpoint
+  for (const msg of messages) {
+    try {
+      const response = await fetch(`${SUSAN_URL}/api/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          projectPath: PROJECT_PATH,
+          message: {
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp
+          }
+        })
+      });
+
+      if (response.ok) {
+        successCount++;
+      }
+    } catch (error) {
+      log('Failed to send message to Susan', { error: error.message });
     }
-  } catch (error) {
-    log('Failed to send to Susan', { error: error.message });
-    return false;
   }
+
+  // Also send a summary/note to remember
+  if (summary || messages.length > 0) {
+    try {
+      await fetch(`${SUSAN_URL}/api/remember`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: 'session-checkpoint',
+          title: `Local session checkpoint - ${new Date().toLocaleString()}`,
+          summary: summary || `${messages.length} messages from local Claude Code session`,
+          projectPath: PROJECT_PATH,
+          tags: ['local-session', 'chad-watcher', sessionId],
+          importance: 3
+        })
+      });
+    } catch (error) {
+      log('Failed to save checkpoint note', { error: error.message });
+    }
+  }
+
+  log('Checkpoint sent to Susan', {
+    messageCount: messages.length,
+    successCount,
+    sessionId
+  });
+
+  return successCount > 0;
 }
 
 /**
