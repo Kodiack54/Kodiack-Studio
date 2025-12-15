@@ -1,0 +1,21 @@
+{
+  "name": "kodiack-studio",
+  "version": "1.0.0",
+  "description": "MCP server connecting Claude Code to Susan's memory - The Kodiack Development Platform",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "kodiack-studio": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "node-fetch": "^3.3.2"
+  },
+  "keywords": ["mcp", "claude", "memory", "susan", "kodiack", "development"],
+  "author": "Kodiack Dev",
+  "license": "MIT"
+}
