@@ -397,7 +397,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'susan_search_knowledge': {
         const { query, category } = args;
-        let endpoint = `/api/knowledge/search?q=${encodeURIComponent(query)}`;
+        let endpoint = `/api/query?q=${encodeURIComponent(query)}`;
         if (category) {
           endpoint += `&category=${encodeURIComponent(category)}`;
         }
